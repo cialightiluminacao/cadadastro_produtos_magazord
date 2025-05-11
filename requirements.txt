@@ -1,0 +1,12 @@
+Flask==2.3.3
+Flask-WTF==1.1.1
+Flask-SQLAlchemy==3.1.1
+pandas==2.1.1
+openpyxl==3.1.2
+requests==2.31.0
+fuzzywuzzy[speedup]==0.18.0
+python-Levenshtein==0.21.1
+beautifulsoup4==4.12.2
+Werkzeug==2.3.7
+APScheduler
+Pillow==8.3.2

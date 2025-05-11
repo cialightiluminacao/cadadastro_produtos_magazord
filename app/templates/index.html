@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h2>Upload de Produtos</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" id="uploadForm">
+                <div class="mb-3">
+                    <label for="file" class="form-label">
+                        <i class="fas fa-file-excel text-success"></i> Arquivo Excel (.xlsx)
+                    </label>
+                    <input type="file" class="form-control" id="file" name="file" required accept=".xlsx">
+                    <div class="form-text">
+                        <i class="fas fa-info-circle"></i> Selecione o arquivo Excel com os produtos a serem cadastrados.
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="marca_id" class="form-label">
+                        <i class="fas fa-trademark"></i> Marca
+                    </label>
+                    <select class="form-select" id="marca_id" name="marca_id" required>
+                        <option value="">Selecione uma marca...</option>
+                        {% for marca in marcas %}
+                            <option value="{{ marca['id'] }}">{{ marca['nome'] }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">
+                        <i class="fas fa-info-circle"></i> Selecione a marca dos produtos.
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="origem_fiscal" class="form-label">
+                        <i class="fas fa-globe"></i> Origem Fiscal
+                    </label>
+                    <select class="form-select" id="origem_fiscal" name="origem_fiscal" required>
+                        <option value="">Selecione a origem fiscal...</option>
+                        <option value="0">0 - Nacional, exceto as indicadas nos códigos 3 a 5</option>
+                        <option value="1">1 - Estrangeira - Importação direta</option>
+                        <option value="2">2 - Estrangeira - Adquirida no mercado interno</option>
+                        <option value="3">3 - Nacional, mercadoria ou bem com Conteúdo de Importação superior a 40%</option>
+                        <option value="4">4 - Nacional, produção conforme processos produtivos básicos</option>
+                        <option value="5">5 - Nacional, mercadoria ou bem com Conteúdo de Importação ≤ 40%</option>
+                        <option value="6">6 - Estrangeira - Importação direta, sem similar nacional</option>
+                        <option value="7">7 - Estrangeira - Adquirida no mercado interno, sem similar nacional</option>
+                        <option value="8">8 - Nacional, mercadoria ou bem com Conteúdo de Importação superior a 70%</option>
+                    </select>
+                    <div class="form-text">
+                        <i class="fas fa-info-circle"></i> Selecione a origem fiscal dos produtos.
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="link_fornecedor" class="form-label">
+                        <i class="fas fa-link"></i> Link do fornecedor (opcional)
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-globe"></i>
+                        </span>
+                        <input type="url" class="form-control" id="link_fornecedor" name="link_fornecedor" 
+                               placeholder="https://www.inspirehome.com.br/sl-iluminacao">
+                    </div>
+                    <div class="form-text">
+                        <i class="fas fa-info-circle"></i> Informe o link da página do fornecedor (ex: InspireHome) para buscar títulos automaticamente.
+                        Se não informado, usará os títulos do arquivo Excel.
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="prefixo_codigo" class="form-label">
+                        <i class="fas fa-code"></i> Prefixo do código (opcional)
+                    </label>
+                    <div class="input-group">
+                        <span class="input-group-text">
+                            <i class="fas fa-tag"></i>
+                        </span>
+                        <input type="text" class="form-control" id="prefixo_codigo" name="prefixo_codigo" 
+                               maxlength="5" placeholder="Ex: SL, RL, etc."
+                               pattern="[A-Za-z]+" title="Apenas letras são permitidas">
+                    </div>
+                    <div class="form-text">
+                        <i class="fas fa-info-circle"></i> Se preenchido, será usado para gerar os códigos pai/filho (Ex: PSL475, SL475).
+                        Se não, será apenas P475 e 475.
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg w-100">
+                    <i class="fas fa-upload me-2"></i> Enviar Arquivo
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Validação do formulário
+    const form = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('file');
+    const prefixoInput = document.getElementById('prefixo_codigo');
+    const linkInput = document.getElementById('link_fornecedor');
+
+    form.addEventListener('submit', function(e) {
+        // Validação do arquivo
+        if (fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            if (!file.name.toLowerCase().endsWith('.xlsx')) {
+                e.preventDefault();
+                alert('Por favor, selecione apenas arquivos .xlsx');
+                return;
+            }
+        }
+
+        // Validação do prefixo (apenas letras)
+        if (prefixoInput.value) {
+            if (!/^[A-Za-z]+$/.test(prefixoInput.value)) {
+                e.preventDefault();
+                alert('O prefixo deve conter apenas letras');
+                prefixoInput.focus();
+                return;
+            }
+        }
+
+        // Validação do link (se preenchido)
+        if (linkInput.value) {
+            try {
+                new URL(linkInput.value);
+            } catch {
+                e.preventDefault();
+                alert('Por favor, insira um link válido');
+                linkInput.focus();
+                return;
+            }
+        }
+    });
+
+    // Converter prefixo para maiúsculas automaticamente
+    prefixoInput.addEventListener('input', function() {
+        this.value = this.value.toUpperCase();
+    });
+});
+</script>
+
+<style>
+.card {
+    border: none;
+    border-radius: 10px;
+}
+
+.form-control:focus, .form-select:focus {
+    border-color: #1a237e;
+    box-shadow: 0 0 0 0.25rem rgba(26, 35, 126, 0.25);
+}
+
+.btn-primary {
+    background-color: #1a237e;
+    border-color: #1a237e;
+}
+
+.btn-primary:hover {
+    background-color: #0d1757;
+    border-color: #0d1757;
+}
+
+.input-group-text {
+    background-color: #f8f9fa;
+    border-right: none;
+}
+
+.input-group .form-control {
+    border-left: none;
+}
+
+.input-group .form-control:focus {
+    border-left: none;
+    border-color: #ced4da;
+}
+
+.form-text {
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.alert {
+    border-left: 5px solid;
+}
+
+.alert-success {
+    border-left-color: #198754;
+}
+
+.alert-danger {
+    border-left-color: #dc3545;
+}
+
+.alert-warning {
+    border-left-color: #ffc107;
+}
+
+.form-label {
+    font-weight: 500;
+    color: #1a237e;
+}
+</style>
+
+{% endblock %}

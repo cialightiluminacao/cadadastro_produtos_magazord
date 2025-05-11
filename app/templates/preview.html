@@ -1,0 +1,285 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container-fluid mt-4">
+    <h2>Pré-visualização dos Produtos</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    {% for category, message in messages %}
+    <div class="alert alert-{{ category }}">{{ message }}</div>
+    {% endfor %}
+    {% endif %}
+    {% endwith %}
+
+    {% if relatorio_ignorados %}
+    <div class="alert alert-warning">
+        <strong><i class="fas fa-exclamation-triangle"></i> Atenção:</strong> 
+        Alguns produtos foram ignorados por falta de campos obrigatórios.
+        <a href="{{ url_for('main.relatorio_ignorados') }}" class="btn btn-sm btn-warning ms-2">
+            <i class="fas fa-download"></i> Baixar relatório de ignorados
+        </a>
+    </div>
+    {% endif %}
+
+    {% if relatorio_sem_imagem %}
+    <div class="alert alert-info">
+        <strong><i class="fas fa-image"></i> Produtos sem imagem:</strong>
+        <a href="{{ url_for('main.relatorio_sem_imagem') }}" class="btn btn-sm btn-info ms-2">
+            <i class="fas fa-download"></i> Baixar relatório de produtos sem imagem
+        </a>
+    </div>
+    {% endif %}
+
+    <div id="progress-bar-container" {% if not loading %}style="display:none;"{% endif %}>
+        <div class="progress mb-3" style="height: 30px;">
+            <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" 
+                role="progressbar" style="width: 0%">0%</div>
+        </div>
+        <p id="progress-text" class="text-center">Processando produtos...</p>
+        <div id="preview-status-list" class="mt-3"></div>
+    </div>
+
+    {% if produtos and not loading %}
+    <form method="post" id="previewForm">
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>ID</th>
+                        <th style="min-width: 300px;">Título</th>
+                        <th>Categoria</th>
+                        <th>Marca</th>
+                        <th>Origem Fiscal</th>
+                        <th>Imagem</th>
+                        {% if produtos and produtos[0] %}
+                        {% for campo in produtos[0].keys() %}
+                        {% if campo not in ['id', 'titulo', 'categoria_id', 'categoria_nome', 'marca_id', 'marca_nome', 'origem_fiscal', 'img_url', 'data_cadastro'] %}
+                        <th>{{ campo|capitalize }}</th>
+                        {% endif %}
+                        {% endfor %}
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for produto in produtos %}
+                    <tr>
+                        <td>{{ produto['id'] }}</td>
+                        <td>
+                            <div class="input-group">
+                                <input type="text" 
+                                    name="titulo_{{ loop.index0 }}" 
+                                    value="{{ produto['titulo'] }}" 
+                                    class="form-control produto-titulo"
+                                    maxlength="100"
+                                    required
+                                    title="Clique para editar o título">
+                                <button type="button" class="btn btn-outline-secondary copy-btn" 
+                                    data-bs-toggle="tooltip" 
+                                    title="Copiar título">
+                                    <i class="fas fa-copy"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td>
+                            <select name="categoria_id_{{ loop.index0 }}" 
+                                class="form-select categoria-select" 
+                                required>
+                                <option value="">Selecione...</option>
+                                {% for categoria in categorias %}
+                                <option value="{{ categoria['id'] }}" 
+                                    {% if categoria['id']|string == produto.get('categoria_id')|string %}selected{% endif %}>
+                                    {{ categoria['nome'] }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                        <td>{{ produto['marca_nome'] }}</td>
+                        <td>{{ produto.get('origem_fiscal', '0 - Nacional') }}</td>
+                        <td class="text-center">
+                            {% if produto['img_url'] %}
+                            <a href="{{ url_for('static', filename=produto['img_url'].replace('static/', '').lstrip('/')) }}" 
+                                target="_blank" 
+                                data-bs-toggle="tooltip" 
+                                title="Clique para ampliar">
+                                <img src="{{ url_for('static', filename=produto['img_url'].replace('static/', '').lstrip('/')) }}" 
+                                    alt="Imagem do produto" 
+                                    style="max-width:80px; max-height:80px;"
+                                    class="img-thumbnail"
+                                    onerror="this.onerror=null; this.src='{{ url_for('static', filename='blank_1000x1000.png') }}';">
+                            </a>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">
+                                <i class="fas fa-image"></i> Sem imagem
+                            </span>
+                            {% endif %}
+                        </td>
+                        {% for campo in produto.keys() %}
+                        {% if campo not in ['id', 'titulo', 'categoria_id', 'categoria_nome', 'marca_id', 'marca_nome', 'origem_fiscal', 'img_url', 'data_cadastro'] %}
+                        <td>{{ produto[campo] }}</td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="d-flex justify-content-between mt-3 mb-5">
+            <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Voltar
+            </a>
+            <button type="submit" class="btn btn-success" id="submitBtn">
+                <i class="fas fa-check"></i> Confirmar e Cadastrar
+            </button>
+        </div>
+    </form>
+    {% endif %}
+</div>
+
+<script>
+// Função para atualizar o progresso e status linha a linha
+function checkProgress() {
+    fetch('/progress')
+    .then(response => response.json())
+    .then(data => {
+        let pct = data.progress;
+        let bar = document.getElementById("progress-bar");
+        bar.style.width = pct + "%";
+        bar.innerText = pct + "%";
+        
+        // Atualiza status linha a linha
+        fetch('/preview_status')
+        .then(resp => resp.json())
+        .then(statusData => {
+            let statusList = statusData.status || [];
+            let html = '<ul class="list-group">';
+            statusList.forEach(st => {
+                let badge = st.status === "OK" ? "success" : (st.status === "ERRO" ? "danger" : "secondary");
+                html += `<li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><strong>${st.id}</strong> - ${st.titulo}</span>
+                    <span class="badge bg-${badge}">${st.status}</span>
+                    <span class="ms-2 small">${st.mensagem}</span>
+                </li>`;
+            });
+            html += '</ul>';
+            document.getElementById("preview-status-list").innerHTML = html;
+        });
+
+        if (pct < 100) {
+            setTimeout(checkProgress, 1000);
+        } else {
+            document.getElementById("progress-text").innerText = "Finalizado! Recarregando...";
+            setTimeout(function(){ location.reload(); }, 1500);
+        }
+    })
+    .catch(error => {
+        console.error('Erro ao verificar progresso:', error);
+        setTimeout(checkProgress, 2000);
+    });
+}
+
+// Inicialização dos tooltips do Bootstrap
+document.addEventListener("DOMContentLoaded", function() {
+    var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
+    var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+        return new bootstrap.Tooltip(tooltipTriggerEl)
+    });
+
+    // Função para copiar título
+    document.querySelectorAll('.copy-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            input.select();
+            document.execCommand('copy');
+            
+            // Feedback visual
+            const originalTitle = this.getAttribute('data-bs-original-title');
+            this.setAttribute('data-bs-original-title', 'Copiado!');
+            bootstrap.Tooltip.getInstance(this).show();
+            
+            setTimeout(() => {
+                this.setAttribute('data-bs-original-title', originalTitle);
+            }, 1000);
+        });
+    });
+
+    // Validação do formulário
+    let previewForm = document.getElementById('previewForm');
+    if (previewForm) {
+        previewForm.addEventListener('submit', function(e) {
+            let valid = true;
+            
+            // Verifica títulos
+            this.querySelectorAll('.produto-titulo').forEach(input => {
+                if (!input.value.trim()) {
+                    valid = false;
+                    input.classList.add('is-invalid');
+                } else {
+                    input.classList.remove('is-invalid');
+                }
+            });
+            
+            // Verifica categorias
+            this.querySelectorAll('.categoria-select').forEach(select => {
+                if (!select.value) {
+                    valid = false;
+                    select.classList.add('is-invalid');
+                } else {
+                    select.classList.remove('is-invalid');
+                }
+            });
+            
+            if (!valid) {
+                e.preventDefault();
+                alert('Por favor, preencha todos os campos obrigatórios!');
+            }
+        });
+    }
+
+    // Inicia verificação de progresso se necessário
+    if (document.getElementById("progress-bar-container").style.display !== "none") {
+        checkProgress();
+    }
+});
+</script>
+
+<style>
+.produto-titulo {
+    font-size: 0.9rem;
+}
+
+.copy-btn:hover {
+    background-color: #e9ecef;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+}
+
+.img-thumbnail:hover {
+    transform: scale(1.1);
+    transition: transform 0.2s;
+}
+
+.is-invalid {
+    border-color: #dc3545;
+    box-shadow: 0 0 0 0.25rem rgba(220, 53, 69, 0.25);
+}
+
+/* Melhorias para visualização das imagens */
+.img-thumbnail {
+    border: 1px solid #dee2e6;
+    padding: 3px;
+    background-color: #fff;
+    border-radius: 4px;
+    object-fit: contain;
+}
+
+.badge {
+    padding: 0.5em 0.75em;
+}
+</style>
+
+{% endblock %}

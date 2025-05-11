@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h2>Mapeamento de Colunas do Excel</h2>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ category }} alert-dismissible fade show">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+            <form method="post">
+                <h5 class="mb-3">Campos obrigatórios</h5>
+                <div class="row">
+                    {% for campo, col in mapeamento_obrigatorio.items() %}
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">{{ campo|capitalize }}</label>
+                        <select class="form-select" name="obrigatorio_{{ campo }}" required>
+                            <option value="">Selecione...</option>
+                            {% for h in header %}
+                                <option value="{{ h }}" {% if h == col %}selected{% endif %}>{{ h }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <h5 class="mb-3 mt-4">Campos opcionais</h5>
+                <div class="row">
+                    {% for campo, col in mapeamento_opcional.items() %}
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">{{ campo|capitalize }}</label>
+                        <select class="form-select" name="opcional_{{ campo }}">
+                            <option value="">Ignorar</option>
+                            {% for h in header %}
+                                <option value="{{ h }}" {% if h == col %}selected{% endif %}>{{ h }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if faltando %}
+                <div class="alert alert-danger mt-3">
+                    <strong>Os seguintes campos obrigatórios não foram mapeados:</strong>
+                    <ul>
+                        {% for f in faltando %}
+                        <li>{{ f|capitalize }}</li>
+                        {% endfor %}
+                    </ul>
+                    Por favor, revise o mapeamento antes de continuar.
+                </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-between mt-4">
+                    <a href="{{ url_for('main.index') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Voltar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check"></i> Confirmar Mapeamento
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+.card {
+    border: none;
+    border-radius: 10px;
+}
+.form-label {
+    font-weight: 500;
+    color: #1a237e;
+}
+</style>
+
+{% endblock %}
